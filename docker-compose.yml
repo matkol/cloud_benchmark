@@ -1,0 +1,54 @@
+version: "3.9"
+
+services:
+
+  web:
+    image: cstr_download_test
+    container_name: web
+    ports:
+      - 5000:5000
+    command: "flask --app app/api.py run --host=0.0.0.0"
+    volumes:
+        - ~/.config/gcloud/application_default_credentials.json:/gcp/creds.json
+        - ./app:/app/app
+    environment:
+      GOOGLE_APPLICATION_CREDENTIALS: /gcp/creds.json
+      FLASK_DEBUG: 1
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/1
+    depends_on:
+      - redis
+
+  worker:
+    image: cstr_download_test
+    container_name: worker
+    command: celery --app app.tasks.celery worker --loglevel=INFO
+    volumes:
+      - ~/.config/gcloud/application_default_credentials.json:/gcp/creds.json
+      - ./app/:/app/app
+    environment:
+      GOOGLE_APPLICATION_CREDENTIALS: /gcp/creds.json
+      FLASK_DEBUG: 1
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/1
+    depends_on:
+      - web
+      - redis
+
+  dashboard:
+    image: cstr_download_test
+    container_name: flower
+    command: celery --app app.tasks.celery flower --port=5555 --broker=redis://redis:6379/0
+    ports:
+      - 5556:5555
+    environment:
+      - FLASK_DEBUG=1
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+    depends_on:
+      - web
+      - redis
+      - worker
+
+  redis:
+    image: redis:alpine

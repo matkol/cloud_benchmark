@@ -1,0 +1,4 @@
+# Filter unwanted files from included folders.
+**/__pycache__
+**.py[cod]
+**.egg-info
